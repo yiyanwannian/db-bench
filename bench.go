@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	keySize   = flag.Int("keysz", 0, "Key size in bytes.")
+	//keySize   = flag.Int("keysz", 0, "Key size in bytes.")
 	valueSize = flag.Int("valsz", 0, "Value size in bytes.")
 	bsize     = flag.Int("batchsz", 1, "How many keys each batch write.")
 	start     = flag.Int("start", 1, "data write count range start.")
@@ -121,7 +121,7 @@ func main() {
 	//batchSize := 10000
 
 	flag.Parse()
-	keySz := *keySize
+	keySz := 72 //*keySize
 	valueSz := *valueSize
 	startPoint := *start
 	batchSize := *bsize
