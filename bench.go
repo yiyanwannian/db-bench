@@ -11,6 +11,11 @@ import (
 	lvlopt "github.com/syndtr/goleveldb/leveldb/opt"
 )
 
+const (
+	KiB = 1024
+	MiB = KiB * 1024
+)
+
 var (
 	//keySize   = flag.Int("keysz", 0, "Key size in bytes.")
 	valueSize = flag.Int("valsz", 0, "Value size in bytes.")
@@ -141,11 +146,19 @@ func main() {
 
 func leveldbTest(keysz, valuesz, batchSize, startPoint, wTimes int) {
 	var err error
-
 	rand.Seed(time.Now().Unix())
 	lPath := fmt.Sprintf("./data/level-k%d-v%d", keysz, valuesz)
 	_ = os.MkdirAll(lPath, 0777)
-	level, err = leveldb.OpenFile(lPath, &lvlopt.Options{})
+	opt := &lvlopt.Options{}
+	opt.CompactionL0Trigger = 16
+	opt.WriteL0SlowdownTrigger = 20
+	opt.WriteL0PauseTrigger = 24
+	opt.NoSync = true
+	opt.DisableLargeBatchTransaction = false
+	opt.WriteBuffer = 8 * MiB
+	opt.CompactionTableSize = 8 * MiB
+	opt.CompactionTotalSize = 40 * MiB
+	level, err = leveldb.OpenFile(lPath, opt)
 	if err != nil {
 		panic(err)
 	}
@@ -172,7 +185,16 @@ func leveldbTest(keysz, valuesz, batchSize, startPoint, wTimes int) {
 			panic(err)
 		}
 		wEnd := time.Since(lStart)
-		fmt.Printf("leveldb %s write %d st data, time used: prepare: %d, write: %d\n",
-			infoStr, i, wStart.Milliseconds(), (wEnd - wStart).Milliseconds())
+
+		for ri := 0; ri < batchSize/1000; ri++ {
+			//for ri := 0; ri < batchSize; ri++ {
+			_, err = level.Get(entries[ri].Key, nil)
+			if err != nil {
+				panic(err)
+			}
+		}
+		rEnd := time.Since(lStart)
+		fmt.Println(fmt.Sprintf("leveldb %s write %d st data, time used: prepare: %dms, write: %dms, read(1/1000): %dμs",
+			infoStr, i, wStart.Milliseconds(), (wEnd - wStart).Milliseconds(), (rEnd - wEnd).Microseconds()))
 	}
 }
