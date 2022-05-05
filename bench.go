@@ -174,12 +174,12 @@ func leveldbTest(keysz, valuesz, batchSize, startPoint, wTimes int) {
 			entries = append(entries, e)
 		}
 
-		wStart := time.Since(lStart)
 		lb := &leveldb.Batch{}
 		for j := 0; j < batchSize; j++ {
 			lb.Put(entries[j].Key, entries[j].Value)
 		}
 
+		wStart := time.Since(lStart)
 		err = level.Write(lb, &lvlopt.WriteOptions{Sync: false})
 		if err != nil {
 			panic(err)
@@ -188,7 +188,7 @@ func leveldbTest(keysz, valuesz, batchSize, startPoint, wTimes int) {
 
 		for ri := 0; ri < batchSize/1000; ri++ {
 			//for ri := 0; ri < batchSize; ri++ {
-			_, err = level.Get(entries[ri].Key, nil)
+			_, err = level.Get(entries[rand.Intn(batchSize)].Key, nil)
 			if err != nil {
 				panic(err)
 			}
