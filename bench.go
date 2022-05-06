@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/syndtr/goleveldb/leveldb"
@@ -206,14 +207,21 @@ func leveldbTest(keysz, valuesz, batchSize, startPoint, wTimes int) {
 		wEnd := time.Since(lStart)
 
 		//for ri := 0; ri < batchSize/1000; ri++ {
+		wg := sync.WaitGroup{}
+		wg.Add(batchSize)
 		for ri := 0; ri < batchSize; ri++ {
-			keyM := cachedKey[rand.Intn(len(cachedKey))]
-			key := zxlKey(valuesz, keyM.rInt, keyM.indexI, keyM.indexJ)
-			_, err = level.Get([]byte(key), nil)
-			if err != nil && err != leveldb.ErrNotFound {
-				panic(err)
-			}
+			go func() {
+				defer wg.Done()
+				keyM := cachedKey[rand.Intn(len(cachedKey))]
+				key := zxlKey(valuesz, keyM.rInt, keyM.indexI, keyM.indexJ)
+				_, err = level.Get([]byte(key), nil)
+				if err != nil && err != leveldb.ErrNotFound {
+					panic(err)
+				}
+			}()
 		}
+
+		wg.Wait()
 		rEnd := time.Since(lStart)
 		fmt.Println(fmt.Sprintf("leveldb %s write %d st data, time used: prepare: %d, write: %d, read: %d",
 			infoStr, i, wStart.Milliseconds(), (wEnd - wStart).Milliseconds(), (rEnd - wEnd).Milliseconds()))
