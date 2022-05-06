@@ -14,6 +14,8 @@ import (
 const (
 	KiB = 1024
 	MiB = KiB * 1024
+
+	cachedKeyNum = 100000000
 )
 
 var (
@@ -60,10 +62,20 @@ var (
 	value16KB = ""
 )
 
+var cachedKey []*keyMeta
+
 func init() {
 	for i := 0; i < 16; i++ {
 		value16KB = value16KB + value1024
 	}
+
+	cachedKey = make([]*keyMeta, 0, cachedKeyNum) // cache 100 million least input key
+}
+
+type keyMeta struct {
+	indexI int
+	indexJ int
+	rInt   int
 }
 
 type entry struct {
@@ -72,11 +84,15 @@ type entry struct {
 	Meta  byte
 }
 
-func fillEntryWithIndex(e *entry, valueSz, index int) {
-	k := rand.Intn(10000000)
+func zxlKey(valueSz, rint, indexi, indexj int) string {
+	return fmt.Sprintf("nft_vsz=%010d-k=%036d-%05d-%05d_39", rint, valueSz, indexj, indexi) // 72 bytes.
+}
+
+func fillEntryWithIndex(e *entry, valueSz int, key string) {
 	//tmp := "nft_e5151b3cecdf2253182132a2d88ef094e9e3e745387bf0cf3b366ff65b1d5507_393"
 	//key := fmt.Sprintf("vsz=%036d-k=%010d-%010d", *valueSize, k, index) // 64 bytes.
-	key := fmt.Sprintf("nft_vsz=%036d-k=%010d-%010d_393", *valueSize, k, index) // 64 bytes.
+	//key := fmt.Sprintf("nft_vsz=%036d-k=%010d-%05d-%05d_39", valueSz, rand.Intn(10000000), indexj, indexi) // 64 bytes.
+	//key := zxlKey(valueSz, rand.Intn(100000000), indexi, indexj)
 	if cap(e.Key) < len(key) {
 		e.Key = make([]byte, 2*len(key))
 	}
@@ -170,7 +186,10 @@ func leveldbTest(keysz, valuesz, batchSize, startPoint, wTimes int) {
 		entries := make([]*entry, 0, batchSize)
 		for k := 0; k < batchSize; k++ {
 			e := new(entry)
-			fillEntryWithIndex(e, valuesz, k)
+			rint := rand.Intn(cachedKeyNum)
+			addCacheKey(i, k, rint)
+			key := zxlKey(valuesz, rint, i, k)
+			fillEntryWithIndex(e, valuesz, key)
 			entries = append(entries, e)
 		}
 
@@ -186,15 +205,28 @@ func leveldbTest(keysz, valuesz, batchSize, startPoint, wTimes int) {
 		}
 		wEnd := time.Since(lStart)
 
-		for ri := 0; ri < batchSize/1000; ri++ {
-			//for ri := 0; ri < batchSize; ri++ {
-			_, err = level.Get(entries[rand.Intn(batchSize)].Key, nil)
-			if err != nil {
+		//for ri := 0; ri < batchSize/1000; ri++ {
+		for ri := 0; ri < batchSize; ri++ {
+			keyM := cachedKey[rand.Intn(len(cachedKey))]
+			key := zxlKey(valuesz, keyM.rInt, keyM.indexI, keyM.indexJ)
+			_, err = level.Get([]byte(key), nil)
+			if err != nil && err != leveldb.ErrNotFound {
 				panic(err)
 			}
 		}
 		rEnd := time.Since(lStart)
-		fmt.Println(fmt.Sprintf("leveldb %s write %d st data, time used: prepare: %dms, write: %dms, read(1/1000): %dμs",
-			infoStr, i, wStart.Milliseconds(), (wEnd - wStart).Milliseconds(), (rEnd - wEnd).Microseconds()))
+		fmt.Println(fmt.Sprintf("leveldb %s write %d st data, time used: prepare: %d, write: %d, read: %d",
+			infoStr, i, wStart.Milliseconds(), (wEnd - wStart).Milliseconds(), (rEnd - wEnd).Milliseconds()))
+	}
+}
+
+func addCacheKey(indexI, indexJ, rInt int) {
+	cachedKey = append(cachedKey, &keyMeta{
+		indexI: indexI,
+		indexJ: indexJ,
+		rInt:   rInt,
+	})
+	if len(cachedKey) >= cachedKeyNum {
+		cachedKey = cachedKey[10000:]
 	}
 }
