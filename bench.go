@@ -188,7 +188,7 @@ func leveldbTest(keysz, valuesz, batchSize, startPoint, wTimes int) {
 		for k := 0; k < batchSize; k++ {
 			e := new(entry)
 			rint := rand.Intn(cachedKeyNum)
-			//addCacheKey(i, k, rint)
+			addCacheKey(i, k, rint)
 			key := zxlKey(valuesz, rint, i, k)
 			fillEntryWithIndex(e, valuesz, key)
 			entries = append(entries, e)
@@ -212,9 +212,9 @@ func leveldbTest(keysz, valuesz, batchSize, startPoint, wTimes int) {
 		for ri := 0; ri < batchSize; ri++ {
 			go func() {
 				defer wg.Done()
-				//keyM := cachedKey[rand.Intn(len(cachedKey))]
-				//key := zxlKey(valuesz, keyM.rInt, keyM.indexI, keyM.indexJ)
-				key := zxlKey(valuesz, rand.Intn(cachedKeyNum), i, ri)
+				keyM := cachedKey[rand.Intn(len(cachedKey))]
+				key := zxlKey(valuesz, keyM.rInt, keyM.indexI, keyM.indexJ)
+				//key := zxlKey(valuesz, rand.Intn(cachedKeyNum), i, ri)
 				_, err = level.Get([]byte(key), nil)
 				if err != nil && err != leveldb.ErrNotFound {
 					panic(err)
